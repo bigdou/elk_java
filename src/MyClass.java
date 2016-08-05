@@ -8,6 +8,7 @@ import com.x5.template.Chunk;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.command.DockerCmdExecFactory;
 import com.github.dockerjava.api.exception.DockerException;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.ExposedPort;
@@ -16,12 +17,31 @@ import com.github.dockerjava.api.model.Info;
 import com.github.dockerjava.api.model.Ports;
 import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.core.DockerClientBuilder;
+import com.github.dockerjava.core.DockerClientConfig;
 import com.github.dockerjava.core.command.BuildImageResultCallback;
+import com.github.dockerjava.jaxrs.DockerCmdExecFactoryImpl;
 
 public class MyClass {
 	public static void main(String[] args) throws DockerException, IOException{
-		DockerClient dockerClient = DockerClientBuilder.getInstance("unix:///var/run/docker.sock").build();
+		// DockerClient dockerClient = DockerClientBuilder.getInstance("unix:///var/run/docker.sock").build();
+		
+		// use api 1.23
+		DockerClientConfig config = DockerClientConfig.createDefaultConfigBuilder()
+		  .withDockerHost("unix:///var/run/docker.sock")
+		  .withApiVersion("1.23")
+		  .build();
 
+		// using jaxrs/jersey implementation here (netty impl is also available)
+		DockerCmdExecFactory dockerCmdExecFactory = new DockerCmdExecFactoryImpl()
+		  .withReadTimeout(1000)
+		  .withConnectTimeout(1000)
+		  .withMaxTotalConnections(100)
+		  .withMaxPerRouteConnections(10);
+
+		DockerClient dockerClient = DockerClientBuilder.getInstance(config)
+		  .withDockerCmdExecFactory(dockerCmdExecFactory)
+		  .build();		
+		
 		Volume volume_elasticsearch = new Volume("/usr/share/elasticsearch/data");
 		Volume volume_logstash = new Volume("/opt/logstash/data");
 		Volume volume_kibana = new Volume("/opt/kibana/data");
@@ -82,8 +102,8 @@ public class MyClass {
 		List<Image> dockerList =  dockerClient.listImagesCmd().exec();
 		System.out.println("Search returned" + dockerList.toString());
 		
-		ExposedPort tcp9200 = ExposedPort.tcp(9300);
-		ExposedPort tcp9300 = ExposedPort.tcp(9200);
+		ExposedPort tcp9200 = ExposedPort.tcp(9200);
+		ExposedPort tcp9300 = ExposedPort.tcp(9300);
 		Ports portBindings = new Ports();
 		portBindings.bind(tcp9200, Ports.Binding.bindPort(9200));
 		portBindings.bind(tcp9300, Ports.Binding.bindPort(9300));
@@ -92,9 +112,9 @@ public class MyClass {
 				.withVolumes(volume_elasticsearch)
 				.withName("stack_elk_elasticsearch")
 				.withCmd("elasticsearch",
-						"-Des.insecure.allow.root=true",
-						new String(String.format("----network.host= %s", "127.0.0.1")))
-//						"----network.host=127.0.0.1")
+					"-Des.insecure.allow.root=true",
+					new String(String.format("--network.host= %s", "127.0.0.1")))
+//					"--network.host=127.0.0.1")
 				.withPortBindings(portBindings)
 				.withBinds(new Bind("/volume/elasticsearch", volume_elasticsearch))
 				.exec();
@@ -120,8 +140,8 @@ public class MyClass {
 		dockerClient.startContainerCmd(container_logstash.getId()).exec();
 		dockerClient.startContainerCmd(container_kibana.getId()).exec();
 
-		//		InspectContainerResponse containerInfo = dockerClient.inspectContainerCmd(container_elasticsearch.getId()).exec();
-		//		System.out.println(containerInfo.getState().getStatus());
+		//	InspectContainerResponse containerInfo = dockerClient.inspectContainerCmd(container_elasticsearch.getId()).exec();
+		//	System.out.println(containerInfo.getState().getStatus());
 		//      System.out.println(containerInfo.getState().getFinishedAt());
 		//      System.out.println(containerInfo.getState().getExitCode());
 
