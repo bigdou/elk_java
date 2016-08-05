@@ -33,7 +33,6 @@ public class MyClass {
 
 		// using jaxrs/jersey implementation here (netty impl is also available)
 		DockerCmdExecFactory dockerCmdExecFactory = new DockerCmdExecFactoryImpl()
-		  .withReadTimeout(1000)
 		  .withConnectTimeout(1000)
 		  .withMaxTotalConnections(100)
 		  .withMaxPerRouteConnections(10);
